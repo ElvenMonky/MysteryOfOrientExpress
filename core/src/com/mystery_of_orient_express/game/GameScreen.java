@@ -9,6 +9,9 @@ import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.mystery_of_orient_express.match3_engine.controller.IAnimation;
+import com.mystery_of_orient_express.match3_engine.controller.GameFieldController;
+import com.mystery_of_orient_express.match3_engine.model.GameObject;
 
 public class GameScreen extends ScreenAdapter implements InputProcessor
 {
@@ -17,7 +20,7 @@ public class GameScreen extends ScreenAdapter implements InputProcessor
 	private AssetManager assetManager;
 	private Texture backgroundImage;
 	private Texture boardImage;
-	private GameField gameField;
+	private GameFieldController gameFieldController;
 
 	//Screen coordinates
 	private int screenWidth, screenHeight;
@@ -25,7 +28,7 @@ public class GameScreen extends ScreenAdapter implements InputProcessor
 	
 	private InputProcessor inputProcessor = null;
 	
-	public List<IDrawable> objects = new ArrayList<IDrawable>();
+	public List<GameObject> objects = new ArrayList<GameObject>();
 	public List<IAnimation> animations = new ArrayList<IAnimation>();
 
 	public GameScreen(int screenWidth, int screenHeight, SpriteBatch batch, AssetManager assetManager)
@@ -35,17 +38,17 @@ public class GameScreen extends ScreenAdapter implements InputProcessor
 		this.minScreenSize = Math.min(this.screenWidth, this.screenHeight);
 		this.batch = batch;
 		this.assetManager = assetManager;
-		this.gameField = null;
+		this.gameFieldController = null;
 	}
 	
 	public void load()
 	{
 		this.assetManager.load("field.png", Texture.class);
-		for (String name: GameField.gemNames)
+		for (String name: GameFieldController.gemNames)
 		{
 			this.assetManager.load(name, Texture.class);
 		}
-		for (String name: GameField.soundNames)
+		for (String name: GameFieldController.soundNames)
 		{
 			this.assetManager.load(name, Sound.class);
 		}
@@ -55,13 +58,13 @@ public class GameScreen extends ScreenAdapter implements InputProcessor
 	{
 		this.backgroundImage = this.assetManager.get("video.png");
 		this.boardImage = this.assetManager.get("field.png");
-		this.gameField = new GameField(this, this.assetManager);
+		this.gameFieldController = new GameFieldController(this, this.assetManager);
 	}
 	
 	@Override
 	public void render(float delta)
 	{
-		this.gameField.updateFieldState();
+		this.gameFieldController.updateFieldState();
 		for (int index = 0; index < this.animations.size(); ++index)
 		{
 			this.animations.get(index).update(delta);
@@ -69,9 +72,28 @@ public class GameScreen extends ScreenAdapter implements InputProcessor
 		this.batch.draw(this.boardImage, 0, 0, this.minScreenSize, this.minScreenSize);
 		for (int index = 0; index < this.objects.size(); ++index)
 		{
-			this.objects.get(index).draw(this.batch);
+			this.drawObject(this.batch, this.objects.get(index));
 		}
 		this.batch.draw(this.backgroundImage, 0, this.minScreenSize, this.screenWidth, this.screenHeight - this.minScreenSize);
+	}
+	
+	public void drawObject(SpriteBatch batch, GameObject obj)
+	{
+		Texture image = null;
+		if (obj.kind != -1)
+		{
+			image = this.assetManager.get(GameFieldController.gemNames[obj.kind], Texture.class);
+		}
+		if (null != image)
+		{
+			batch.draw(image, obj.posX - obj.sizeX / 2, obj.posY - obj.sizeY / 2, obj.sizeX, obj.sizeY);
+		}
+	}
+	
+	public boolean pickObject(GameObject obj, float x, float y)
+	{
+		return obj.posX - obj.sizeX / 2 <= x && x <= obj.posX + obj.sizeX / 2 &&
+				obj.posY - obj.sizeY / 2 <= y && y <= obj.posY + obj.sizeY / 2;
 	}
 
 	@Override
@@ -80,9 +102,9 @@ public class GameScreen extends ScreenAdapter implements InputProcessor
 		if (pointer != 0)
 			return false;
 
-		if (this.gameField.touchDown(screenX, this.screenHeight - screenY, pointer, button))
+		if (this.gameFieldController.touchDown(screenX, this.screenHeight - screenY, pointer, button))
 		{
-			this.inputProcessor = this.gameField;
+			this.inputProcessor = this.gameFieldController;
 			return true;
 		}
 

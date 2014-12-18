@@ -1,17 +1,19 @@
-package com.mystery_of_orient_express.game;
+package com.mystery_of_orient_express.match3_engine.controller;
 
-public class GemSwapAnimation implements IAnimation
+import com.mystery_of_orient_express.match3_engine.model.GameObject;
+
+public class SwapAnimation implements IAnimation
 {
 	private static final float totalDuration = 0.1f;
 	private static final float totalDurationInv = 10.0f;
 	private IAnimationHandler handler;
-	private GemObject gem1;
-	private GemObject gem2;
+	private GameObject gem1;
+	private GameObject gem2;
 	private float currentDuration;
 	private float distanceX;
 	private float distanceY;
 	private boolean swapBack;
-	public GemSwapAnimation(GemObject gem1, GemObject gem2, boolean swapBack, IAnimationHandler handler)
+	public SwapAnimation(GameObject gem1, GameObject gem2, boolean swapBack, IAnimationHandler handler)
 	{
 		this.handler = handler;
 		this.gem1 = gem1;
@@ -26,15 +28,15 @@ public class GemSwapAnimation implements IAnimation
 	public void update(float delta)
 	{
 		// TODO Auto-generated method stub
-		float currentDelta = Math.min(GemSwapAnimation.totalDuration - this.currentDuration, delta);
-		float deltaX = this.distanceX * currentDelta * GemSwapAnimation.totalDurationInv;
-		float deltaY = this.distanceY * currentDelta * GemSwapAnimation.totalDurationInv;
+		float currentDelta = Math.min(SwapAnimation.totalDuration - this.currentDuration, delta);
+		float deltaX = this.distanceX * currentDelta * SwapAnimation.totalDurationInv;
+		float deltaY = this.distanceY * currentDelta * SwapAnimation.totalDurationInv;
 		this.gem1.posX += deltaX;
 		this.gem1.posY += deltaY;
 		this.gem2.posX -= deltaX;
 		this.gem2.posY -= deltaY;
 		this.currentDuration += delta;
-		if (this.currentDuration >= GemSwapAnimation.totalDuration)
+		if (this.currentDuration >= SwapAnimation.totalDuration)
 		{
 			if (this.swapBack)
 			{
