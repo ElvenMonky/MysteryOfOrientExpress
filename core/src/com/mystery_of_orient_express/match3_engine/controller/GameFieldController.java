@@ -5,7 +5,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.audio.Sound;
 import com.mystery_of_orient_express.game.GameScreen;
@@ -13,7 +12,7 @@ import com.mystery_of_orient_express.match3_engine.model.CellObject;
 import com.mystery_of_orient_express.match3_engine.model.Field;
 import com.mystery_of_orient_express.match3_engine.model.GameObject;
 
-public class GameFieldController implements IAnimationHandler, InputProcessor
+public class GameFieldController implements IAnimationHandler, IGameFieldInputController
 {
 	public static final String[] gemNames = { "gem_yellow.png", "gem_red.png", "gem_green.png", "gem_blue.png", "gem_purple.png", "gem_white.png" };
 	public static final String[] soundNames = { "knock.wav", "mystery3_3.wav", "mystery3_4.wav" };
@@ -26,12 +25,10 @@ public class GameFieldController implements IAnimationHandler, InputProcessor
 	private Field field;
 	
 	//Screen coordinates
-	private int boardOffset;
+	public GameInputProcessor gameInputProcessor;
 	public int cellSize;
 	private int gemSize;
 
-	private int touchedX = -1;
-	private int touchedY = -1;
 	private boolean canMove = false;
 	private boolean needKnock = false;
 	private int combo = 0;
@@ -46,7 +43,8 @@ public class GameFieldController implements IAnimationHandler, InputProcessor
 
 		this.field = new Field((this.gameScreen.minScreenSize - 16) / this.cellSize);
 
-		this.boardOffset = (this.gameScreen.minScreenSize - this.field.size * this.cellSize) / 2;
+		this.gameInputProcessor = new GameInputProcessor(this, this.cellSize,
+				(this.gameScreen.minScreenSize - this.field.size * this.cellSize) / 2);
 
 		this.gameScreen.objects.clear();
 		for (int i = 0; i < this.field.size; ++i)
@@ -56,6 +54,16 @@ public class GameFieldController implements IAnimationHandler, InputProcessor
 				this.field.cells[i][j].object = this.newGem(i, j);
 			}
 		}
+	}
+	
+	public boolean canMove()
+	{
+		return this.canMove;
+	}
+	
+	public boolean checkIndex(int index)
+	{
+		return 0 <= index && index < this.field.size;
 	}
 	
 	private static boolean match3(CellObject prevGem, CellObject thisGem, CellObject nextGem)
@@ -79,25 +87,10 @@ public class GameFieldController implements IAnimationHandler, InputProcessor
 		return null;
 	}
 	
-	private boolean checkIndex(int index)
-	{
-		return 0 <= index && index < this.field.size;
-	}
-	
-	private int coordToIndex(float coord)
-	{
-		return (int)((coord - this.boardOffset) / this.cellSize);
-	}
-	
-	private float indexToCoord(int index)
-	{
-		return (float)(this.boardOffset + (index + 0.5f) * this.cellSize);
-	}
-	
 	private GameObject newGem(int i, int j)
 	{
 		int kind = (int)(Math.random() * GameFieldController.gemNames.length);
-		GameObject newGem = new GameObject(kind, this.indexToCoord(i), this.indexToCoord(j), this.gemSize, this.gemSize);
+		GameObject newGem = new GameObject(kind, this.gameInputProcessor.indexToCoord(i), this.gameInputProcessor.indexToCoord(j), this.gemSize, this.gemSize);
 		this.gameScreen.objects.add(newGem);
 		return newGem;
 	}
@@ -280,7 +273,7 @@ public class GameFieldController implements IAnimationHandler, InputProcessor
 			matchedAll.addAll(matchedInRows.keySet());
 			matchedAll.addAll(matchedInCols.keySet());
 			this.gameScreen.animations.add(new DisappearAnimation(matchedAll, this.gemSize, this));
-			this.assetManager.get(GameFieldController.soundNames[Math.min(this.combo, 2)], Sound.class).play();
+			this.assetManager.get(GameFieldController.soundNames[Math.min(this.combo, 2)], Sound.class).play(0.25f);
 			return;
 		}
 		
@@ -303,48 +296,23 @@ public class GameFieldController implements IAnimationHandler, InputProcessor
 		this.canMove = true;
 	}
 	
-	public boolean trySwap(int screenX, int screenY, float swapDistance)
+	public void swap(int i1, int j1, int i2, int j2)
 	{
-		int dx = screenX - this.touchedX;
-		int dy = screenY - this.touchedY;
-		if (Math.abs(dx) > swapDistance || Math.abs(dy) > swapDistance)
+		this.swapObjects(i1, j1, i2, j2);
+		Map<GameObject, Integer> matchedInRows = this.findMatchedGemsInRows();
+		Map<GameObject, Integer> matchedInCols = this.findMatchedGemsInCols();
+		boolean success = matchedInRows.size() > 0 || matchedInCols.size() > 0;
+		GameObject obj1 = (GameObject)this.field.cells[i1][j1].object;
+		GameObject obj2 = (GameObject)this.field.cells[i2][j2].object;
+		this.gameScreen.animations.add(new SwapAnimation(obj1, obj2, !success, this));
+		if (!success)
 		{
-			int i1 = this.coordToIndex(this.touchedX);
-			int j1 = this.coordToIndex(this.touchedY);
-			
-			int i2 = i1;
-			int j2 = j1;
-
-			if (Math.abs(dx) > Math.abs(dy)) // horizontal
-			{
-				i2 += dx > 0 ? 1 : -1;
-			}
-			else // vertical
-			{
-				j2 += dy > 0 ? 1 : -1;
-			}
-			
-			if (this.checkIndex(i2) && this.checkIndex(j2))
-			{
-				this.swapObjects(i1, j1, i2, j2);
-				Map<GameObject, Integer> matchedInRows = this.findMatchedGemsInRows();
-				Map<GameObject, Integer> matchedInCols = this.findMatchedGemsInCols();
-				boolean success = matchedInRows.size() > 0 || matchedInCols.size() > 0;
-				GameObject obj1 = (GameObject)this.field.cells[i1][j1].object;
-				GameObject obj2 = (GameObject)this.field.cells[i2][j2].object;
-				this.gameScreen.animations.add(new SwapAnimation(obj1, obj2, !success, this));
-				if (!success)
-				{
-					this.swapObjects(i1, j1, i2, j2);
-				}
-				else
-				{
-					this.canMove = false;
-				}
-			}
-			return true;
+			this.swapObjects(i1, j1, i2, j2);
 		}
-		return false;
+		else
+		{
+			this.canMove = false;
+		}
 	}
 	
 	@Override
@@ -367,74 +335,5 @@ public class GameFieldController implements IAnimationHandler, InputProcessor
 			}
 		}
 		this.gameScreen.animations.remove(animation);
-	}
-	
-	@Override
-	public boolean touchDown(int screenX, int screenY, int pointer, int button)
-	{
-		if (!this.canMove)
-			return false;
-
-		int i = this.coordToIndex(screenX);
-		int j = this.coordToIndex(screenY);
-		if (this.checkIndex(i) && this.checkIndex(j))
-		{
-			this.touchedX = screenX;
-			this.touchedY = screenY;
-			return true;
-		}
-		return false;
-	}
-
-	@Override
-	public boolean touchUp(int screenX, int screenY, int pointer, int button)
-	{
-		this.trySwap(screenX, screenY, 0.25f * this.cellSize);
-		
-		this.touchedX = -1;
-		this.touchedY = -1;
-		return true;
-	}
-
-	@Override
-	public boolean touchDragged(int screenX, int screenY, int pointer)
-	{
-		if (this.trySwap(screenX, screenY, this.cellSize))
-		{
-			this.touchedX = -1;
-			this.touchedY = -1;
-			return true;
-		}
-		return false;
-	}
-
-	@Override
-	public boolean mouseMoved(int screenX, int screenY)
-	{
-		return false;
-	}
-
-	@Override
-	public boolean scrolled(int amount)
-	{
-		return false;
-	}
-
-	@Override
-	public boolean keyDown(int keycode)
-	{
-		return false;
-	}
-
-	@Override
-	public boolean keyUp(int keycode)
-	{
-		return false;
-	}
-
-	@Override
-	public boolean keyTyped(char character)
-	{
-		return false;
 	}
 }

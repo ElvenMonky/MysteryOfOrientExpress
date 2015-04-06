@@ -102,9 +102,9 @@ public class GameScreen extends ScreenAdapter implements InputProcessor
 		if (pointer != 0)
 			return false;
 
-		if (this.gameFieldController.touchDown(screenX, this.screenHeight - screenY, pointer, button))
+		if (this.gameFieldController.gameInputProcessor.touchDown(screenX, this.screenHeight - screenY, pointer, button))
 		{
-			this.inputProcessor = this.gameFieldController;
+			this.inputProcessor = this.gameFieldController.gameInputProcessor;
 			return true;
 		}
 
