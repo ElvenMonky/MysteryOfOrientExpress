@@ -3,6 +3,11 @@
 .gradle
 bin/
 tmp/
+
+build/
+war/
+gen/
+
 *.tmp
 *.bak
 *.swp
@@ -34,3 +39,7 @@ local.properties
 
 # TeXlipse plugin
 .texlipse
+
+#core & extension libs/ folders that have no 3rd party dependencies in them
+/gdx/libs
+android/libs/
