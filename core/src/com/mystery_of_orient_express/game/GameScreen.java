@@ -6,21 +6,19 @@ import java.util.ArrayList;
 import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.assets.AssetManager;
-import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.mystery_of_orient_express.match3_engine.controller.IAnimation;
+import com.mystery_of_orient_express.match3_engine.controller.IGameController;
 import com.mystery_of_orient_express.match3_engine.controller.GameFieldController;
-import com.mystery_of_orient_express.match3_engine.model.GameObject;
 
 public class GameScreen extends ScreenAdapter implements InputProcessor
 {
 	//Resources
 	private SpriteBatch batch;
 	private AssetManager assetManager;
-	private Texture backgroundImage;
+	private Texture topPanelImage;
 	private Texture boardImage;
-	private GameFieldController gameFieldController;
+	private List<IGameController> controllers;
 
 	//Screen coordinates
 	private int screenWidth, screenHeight;
@@ -28,9 +26,6 @@ public class GameScreen extends ScreenAdapter implements InputProcessor
 	
 	private InputProcessor inputProcessor = null;
 	
-	public List<GameObject> objects = new ArrayList<GameObject>();
-	public List<IAnimation> animations = new ArrayList<IAnimation>();
-
 	public GameScreen(int screenWidth, int screenHeight, SpriteBatch batch, AssetManager assetManager)
 	{
 		this.screenWidth = screenWidth;
@@ -38,74 +33,51 @@ public class GameScreen extends ScreenAdapter implements InputProcessor
 		this.minScreenSize = Math.min(this.screenWidth, this.screenHeight);
 		this.batch = batch;
 		this.assetManager = assetManager;
-		this.gameFieldController = null;
+		this.controllers = new ArrayList<IGameController>();
+		this.controllers.add(new GameFieldController(this));
 	}
 	
 	public void load()
 	{
+		this.assetManager.load("video.png", Texture.class);
 		this.assetManager.load("field.png", Texture.class);
-		for (String name: GameFieldController.gemNames)
+		for (IGameController controller: this.controllers)
 		{
-			this.assetManager.load(name, Texture.class);
-		}
-		for (String name: GameFieldController.soundNames)
-		{
-			this.assetManager.load(name, Sound.class);
+			controller.load(this.assetManager);
 		}
 	}
 
 	public void initialize()
 	{
-		this.backgroundImage = this.assetManager.get("video.png");
+		this.topPanelImage = this.assetManager.get("video.png");
 		this.boardImage = this.assetManager.get("field.png");
-		this.gameFieldController = new GameFieldController(this, this.assetManager);
 	}
 	
 	@Override
 	public void render(float delta)
 	{
-		this.gameFieldController.updateFieldState();
-		for (int index = 0; index < this.animations.size(); ++index)
-		{
-			this.animations.get(index).update(delta);
-		}
 		this.batch.draw(this.boardImage, 0, 0, this.minScreenSize, this.minScreenSize);
-		for (int index = 0; index < this.objects.size(); ++index)
+		for (IGameController controller: this.controllers)
 		{
-			this.drawObject(this.batch, this.objects.get(index));
+			controller.update(delta);
+			controller.draw(this.batch, this.assetManager);
 		}
-		this.batch.draw(this.backgroundImage, 0, this.minScreenSize, this.screenWidth, this.screenHeight - this.minScreenSize);
+		this.batch.draw(this.topPanelImage, 0, this.minScreenSize, this.screenWidth, this.screenHeight - this.minScreenSize);
 	}
 	
-	public void drawObject(SpriteBatch batch, GameObject obj)
-	{
-		Texture image = null;
-		if (obj.kind != -1)
-		{
-			image = this.assetManager.get(GameFieldController.gemNames[obj.kind], Texture.class);
-		}
-		if (null != image)
-		{
-			batch.draw(image, obj.posX - obj.sizeX / 2, obj.posY - obj.sizeY / 2, obj.sizeX, obj.sizeY);
-		}
-	}
-	
-	public boolean pickObject(GameObject obj, float x, float y)
-	{
-		return obj.posX - obj.sizeX / 2 <= x && x <= obj.posX + obj.sizeX / 2 &&
-				obj.posY - obj.sizeY / 2 <= y && y <= obj.posY + obj.sizeY / 2;
-	}
-
 	@Override
 	public boolean touchDown(int screenX, int screenY, int pointer, int button)
 	{
 		if (pointer != 0)
 			return false;
 
-		if (this.gameFieldController.gameInputProcessor.touchDown(screenX, this.screenHeight - screenY, pointer, button))
+		for (IGameController controller: this.controllers)
 		{
-			this.inputProcessor = this.gameFieldController.gameInputProcessor;
-			return true;
+			if (controller.getInputProcessor().touchDown(screenX, this.screenHeight - screenY, pointer, button))
+			{
+				this.inputProcessor = controller.getInputProcessor();
+				return true;
+			}
 		}
 
 		return false;

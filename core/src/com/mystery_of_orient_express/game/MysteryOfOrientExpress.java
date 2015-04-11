@@ -12,8 +12,9 @@ public class MysteryOfOrientExpress extends Game
 	private int screenWidth, screenHeight;
 	private SpriteBatch batch;
 	private AssetManager assetManager;
-	private GameScreen gameScreen;
 	private Texture splashImage;
+
+	private GameScreen gameScreen;
 	
     @Override
 	public void create()
@@ -47,7 +48,6 @@ public class MysteryOfOrientExpress extends Game
 	    		this.gameScreen.initialize();
 	    		this.setScreen(this.gameScreen);
 	    		Gdx.input.setInputProcessor(this.gameScreen);
-	    		
 	    	}
 	   		float progress = this.assetManager.getProgress();
 	    	this.batch.draw(this.splashImage, 0, 0, this.screenWidth, this.screenHeight * progress);
