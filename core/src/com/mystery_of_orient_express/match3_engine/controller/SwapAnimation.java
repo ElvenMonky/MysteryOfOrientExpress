@@ -1,6 +1,7 @@
 package com.mystery_of_orient_express.match3_engine.controller;
 
 import com.mystery_of_orient_express.match3_engine.model.GameObject;
+import com.mystery_of_orient_express.match3_engine.model.IAnimation;
 
 public class SwapAnimation implements IAnimation
 {
@@ -18,6 +19,8 @@ public class SwapAnimation implements IAnimation
 		this.handler = handler;
 		this.gem1 = gem1;
 		this.gem2 = gem2;
+		this.gem1.activity = 2;
+		this.gem2.activity = 2;
 		this.swapBack = swapBack;
 		this.distanceX = this.gem2.posX - this.gem1.posX;
 		this.distanceY = this.gem2.posY - this.gem1.posY;
@@ -48,6 +51,8 @@ public class SwapAnimation implements IAnimation
 			}
 			else
 			{
+				this.gem1.activity = -1;
+				this.gem2.activity = -1;
 				this.handler.onComplete(this);
 			}
 		}
