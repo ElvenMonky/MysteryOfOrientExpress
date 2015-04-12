@@ -1,6 +1,5 @@
 package com.mystery_of_orient_express.match3_engine.model;
 
-
 public class GameObject extends CellObject
 {
 	public float posX = 0;

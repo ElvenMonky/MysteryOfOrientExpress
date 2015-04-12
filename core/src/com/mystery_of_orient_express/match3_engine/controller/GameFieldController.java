@@ -17,9 +17,10 @@ import com.mystery_of_orient_express.match3_engine.model.Field;
 import com.mystery_of_orient_express.match3_engine.model.GameObject;
 import com.mystery_of_orient_express.match3_engine.model.IAnimation;
 import com.mystery_of_orient_express.match3_engine.model.IGameController;
+import com.mystery_of_orient_express.match3_engine.model.IGameObjectFactory;
 import com.mystery_of_orient_express.match3_engine.score_controller.ScoreController;
 
-public class GameFieldController implements IGameController, IAnimationHandler, IGameFieldInputController
+public class GameFieldController implements IGameController, IAnimationHandler, IGameFieldInputController, IGameObjectFactory
 {
 	private static final String[] gemNames = { "gem_yellow.png", "gem_red.png", "gem_green.png", "gem_blue.png", "gem_purple.png", "gem_white.png" };
 	private static final String[] soundNames = { "knock.wav", "mystery3_3.wav", "mystery3_4.wav" };
@@ -49,20 +50,12 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 		this.minScreenSize = minScreenSize;
 		this.cellSize = 96;
 		this.gemSize = 96;
-
-		this.field = new Field((minScreenSize - 16) / this.cellSize);
-
-		this.gameInputProcessor = new GameInputProcessor(this, this.cellSize,
-				(minScreenSize - this.field.size * this.cellSize) / 2);
+		int fieldSize = (minScreenSize - 16) / this.cellSize;
 
 		this.objects.clear();
-		for (int i = 0; i < this.field.size; ++i)
-		{
-			for (int j = 0; j < this.field.size; ++j)
-			{
-				this.field.cells[i][j].object = this.newGem(i, j);
-			}
-		}
+		this.gameInputProcessor = new GameInputProcessor(this, this.cellSize,
+				(minScreenSize - fieldSize * this.cellSize) / 2);
+		this.field = new Field(this, fieldSize);
 	}
 
 	@Override
@@ -104,31 +97,44 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 		if (obj.kind != -1)
 		{
 			image = assetManager.get(GameFieldController.gemNames[obj.kind], Texture.class);
+			float minX = obj.posX - 0.5f * obj.sizeX;
+			float minY = obj.posY - 0.5f * obj.sizeY;
+			if (obj.effect == CellObject.Effects.AREA)
+			{
+				batch.draw(image, minX - 10, minY, obj.sizeX, obj.sizeY);
+				batch.draw(image, minX, minY - 10, obj.sizeX, obj.sizeY);
+				batch.draw(image, minX + 10, minY, obj.sizeX, obj.sizeY);
+				batch.draw(image, minX, minY + 10, obj.sizeX, obj.sizeY);
+			}
+			else if (obj.effect == CellObject.Effects.H_RAY)
+			{
+				batch.draw(image, minX - 15, minY, obj.sizeX, obj.sizeY);
+				batch.draw(image, minX - 05, minY, obj.sizeX, obj.sizeY);
+				batch.draw(image, minX + 05, minY, obj.sizeX, obj.sizeY);
+				batch.draw(image, minX + 15, minY, obj.sizeX, obj.sizeY);
+			}
+			else if (obj.effect == CellObject.Effects.V_RAY)
+			{
+				batch.draw(image, minX, minY - 15, obj.sizeX, obj.sizeY);
+				batch.draw(image, minX, minY - 05, obj.sizeX, obj.sizeY);
+				batch.draw(image, minX, minY + 05, obj.sizeX, obj.sizeY);
+				batch.draw(image, minX, minY + 15, obj.sizeX, obj.sizeY);
+			}
+			batch.draw(image, minX, minY, obj.sizeX, obj.sizeY);
 		}
-		if (null != image)
+		else if (obj.effect == CellObject.Effects.KIND)
 		{
-			if (obj.effect == 0)
+			float sX = 0.5f * obj.sizeX;
+			float sY = 0.5f * obj.sizeY;
+			float dX = 0.5f * sX;
+			float dY = 0.5f * sY;
+			double a = 2 * Math.PI / GameFieldController.gemNames.length;
+			for (int i = 0; i < GameFieldController.gemNames.length; ++i)
 			{
-				batch.draw(image, obj.posX - 10 - obj.sizeX / 2, obj.posY - obj.sizeY / 2, obj.sizeX, obj.sizeY);
-				batch.draw(image, obj.posX - obj.sizeX / 2, obj.posY - 10 - obj.sizeY / 2, obj.sizeX, obj.sizeY);
-				batch.draw(image, obj.posX + 10 - obj.sizeX / 2, obj.posY - obj.sizeY / 2, obj.sizeX, obj.sizeY);
-				batch.draw(image, obj.posX - obj.sizeX / 2, obj.posY + 10 - obj.sizeY / 2, obj.sizeX, obj.sizeY);
+				image = assetManager.get(GameFieldController.gemNames[i], Texture.class);
+				batch.draw(image, obj.posX - dX + sX * (float)Math.sin(i * a),
+						obj.posY - dY + sY * (float)Math.sin(i * a), sX, sY);
 			}
-			else if (obj.effect == 1)
-			{
-				batch.draw(image, obj.posX - 15 - obj.sizeX / 2, obj.posY - obj.sizeY / 2, obj.sizeX, obj.sizeY);
-				batch.draw(image, obj.posX - 05 - obj.sizeX / 2, obj.posY - obj.sizeY / 2, obj.sizeX, obj.sizeY);
-				batch.draw(image, obj.posX + 05 - obj.sizeX / 2, obj.posY - obj.sizeY / 2, obj.sizeX, obj.sizeY);
-				batch.draw(image, obj.posX + 15 - obj.sizeX / 2, obj.posY - obj.sizeY / 2, obj.sizeX, obj.sizeY);
-			}
-			else if (obj.effect == 2)
-			{
-				batch.draw(image, obj.posX - obj.sizeX / 2, obj.posY - 15 - obj.sizeY / 2, obj.sizeX, obj.sizeY);
-				batch.draw(image, obj.posX - obj.sizeX / 2, obj.posY - 05 - obj.sizeY / 2, obj.sizeX, obj.sizeY);
-				batch.draw(image, obj.posX - obj.sizeX / 2, obj.posY + 05 - obj.sizeY / 2, obj.sizeX, obj.sizeY);
-				batch.draw(image, obj.posX - obj.sizeX / 2, obj.posY + 15 - obj.sizeY / 2, obj.sizeX, obj.sizeY);
-			}
-			batch.draw(image, obj.posX - obj.sizeX / 2, obj.posY - obj.sizeY / 2, obj.sizeX, obj.sizeY);
 		}
 	}
 
@@ -138,6 +144,7 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 		return this.gameInputProcessor;
 	}
 
+	// TODO use or remove this function
 	public boolean pickObject(GameObject obj, float x, float y)
 	{
 		return obj.posX - obj.sizeX / 2 <= x && x <= obj.posX + obj.sizeX / 2 &&
@@ -149,176 +156,20 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 	{
 		return this.canMove;
 	}
-
+	
 	@Override
 	public boolean checkIndex(int index)
 	{
-		return 0 <= index && index < this.field.size;
+		return this.field.checkIndex(index);
 	}
 
-	private static boolean match3(CellObject prevGem, CellObject thisGem, CellObject nextGem)
-	{
-		return thisGem != null && prevGem != null && nextGem != null &&
-				thisGem.kind != -1 && prevGem.kind != -1 && nextGem.kind != -1 &&
-				prevGem.kind == thisGem.kind && thisGem.kind == nextGem.kind;
-	}
-
-	private static Integer match2(CellObject prevGem, CellObject thisGem, CellObject nextGem)
-	{
-		if (thisGem == null || prevGem == null || nextGem == null ||
-			thisGem.kind == -1 || prevGem.kind == -1 || nextGem.kind == -1)
-			return null;
-		if (prevGem.kind == thisGem.kind)
-			return 1;
-		if (thisGem.kind == nextGem.kind)
-			return -1;
-		if (prevGem.kind == nextGem.kind)
-			return 0;
-		return null;
-	}
-
-	private GameObject newGem(int i, int j)
+	@Override
+	public GameObject newGem(int i, int j)
 	{
 		int kind = (int)(Math.random() * GameFieldController.gemNames.length);
 		GameObject newGem = new GameObject(kind, this.gameInputProcessor.indexToCoord(i), this.gameInputProcessor.indexToCoord(j), this.gemSize, this.gemSize);
 		this.objects.add(newGem);
 		return newGem;
-	}
-
-	private void swapObjects(int i1, int j1, int i2, int j2)
-	{
-		CellObject cellObject = this.field.cells[i1][j1].object;
-		this.field.cells[i1][j1].object = this.field.cells[i2][j2].object;
-		this.field.cells[i2][j2].object = cellObject;
-	}
-
-	private void AddGem(Map<GameObject, Integer> map, GameObject gem)
-	{
-		map.put(gem, map.containsKey(gem) ? map.get(gem) + 1 : 0);
-	}
-
-	private Map<GameObject, Integer> findMatchedGemsInRows()
-	{
-		Map<GameObject, Integer> matched = new HashMap<GameObject, Integer>();
-		for (int j = 0; j < this.field.size; ++j)
-		{
-			for (int i = 1; i < this.field.size - 1; ++i)
-			{
-				CellObject prevGem = this.field.cells[i - 1][j].object;
-				CellObject thisGem = this.field.cells[i * 1][j].object;
-				CellObject nextGem = this.field.cells[i + 1][j].object;
-				if (GameFieldController.match3(prevGem, thisGem, nextGem))
-				{
-					this.AddGem(matched, (GameObject)prevGem);
-					this.AddGem(matched, (GameObject)thisGem);
-					this.AddGem(matched, (GameObject)nextGem);
-				}
-			}
-		}
-		return matched;
-	}
-
-	private Map<GameObject, Integer> findMatchedGemsInCols()
-	{
-		Map<GameObject, Integer> matched = new HashMap<GameObject, Integer>();
-		for (int i = 0; i < this.field.size; ++i)
-		{
-			for (int j = 1; j < this.field.size - 1; ++j)
-			{
-				CellObject prevGem = this.field.cells[i][j - 1].object;
-				CellObject thisGem = this.field.cells[i][j * 1].object;
-				CellObject nextGem = this.field.cells[i][j + 1].object;
-				if (GameFieldController.match3(prevGem, thisGem, nextGem))
-				{
-					this.AddGem(matched, (GameObject)prevGem);
-					this.AddGem(matched, (GameObject)thisGem);
-					this.AddGem(matched, (GameObject)nextGem);
-				}
-			}
-		}
-		return matched;
-	}
-
-	private Set<GameObject> findGemsToFall()
-	{
-		Set<GameObject> gemsToFall = new HashSet<GameObject>();
-		for (int i = 0; i < this.field.size; ++i)
-		{
-			for (int j = 0; j < this.field.size; ++j)
-			{
-				CellObject thisGem = this.field.cells[i][j].object;
-				if (thisGem != null)
-					continue;
-
-				if (j == this.field.size - 1)
-				{
-					thisGem = this.newGem(i, j + 1);
-				}
-				else
-				{
-					thisGem = this.field.cells[i][j + 1].object;
-					this.field.cells[i][j + 1].object = null; // enables chained falling
-				}
-				this.field.cells[i][j].object = thisGem;
-				if (thisGem == null)
-					continue;
-				
-				gemsToFall.add((GameObject)thisGem);
-			}
-		}
-		return gemsToFall;
-	}
-
-	private boolean testNoMoves()
-	{
-		for (int i = 0; i < this.field.size; ++i)
-		{
-			for (int j = 1; j < this.field.size - 1; ++j)
-			{
-				CellObject prevGem = this.field.cells[i][j - 1].object;
-				CellObject thisGem = this.field.cells[i][j * 1].object;
-				CellObject nextGem = this.field.cells[i][j + 1].object;
-				Integer result = GameFieldController.match2(prevGem, thisGem, nextGem);
-				if (result == null)
-					continue;
-
-				int kind = result == -1 ? nextGem.kind : prevGem.kind;
-				int index = j + 2 * result;
-				if (this.checkIndex(index) && this.field.cells[i][index].object.kind == kind)
-					return false;
-
-				index = j + result;
-				if (this.checkIndex(i - 1) && this.field.cells[i - 1][index].object.kind == kind)
-					return false;
-				if (this.checkIndex(i + 1) && this.field.cells[i + 1][index].object.kind == kind)
-					return false;
-			}
-		}
-
-		for (int j = 0; j < this.field.size; ++j)
-		{
-			for (int i = 1; i < this.field.size - 1; ++i)
-			{
-				CellObject prevGem = this.field.cells[i - 1][j].object;
-				CellObject thisGem = this.field.cells[i * 1][j].object;
-				CellObject nextGem = this.field.cells[i + 1][j].object;
-				Integer result = GameFieldController.match2(prevGem, thisGem, nextGem);
-				if (result == null)
-					continue;
-
-				int kind = result == -1 ? nextGem.kind : prevGem.kind;
-				int index = i + 2 * result;
-				if (this.checkIndex(index) && this.field.cells[index][j].object.kind == kind)
-					return false;
-
-				index = i + result;
-				if (this.checkIndex(j - 1) && this.field.cells[index][j - 1].object.kind == kind)
-					return false;
-				if (this.checkIndex(j + 1) && this.field.cells[index][j + 1].object.kind == kind)
-					return false;
-			}
-		}
-		return true;
 	}
 
 	public void updateFieldState(AssetManager assetManager)
@@ -328,7 +179,7 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 			return;
 
 		//If there is gems to fall - make them all fall first
-		Set<GameObject> gemsToFall = this.findGemsToFall();
+		Set<GameObject> gemsToFall = this.field.findGemsToFall();
 		if (gemsToFall.size() > 0)
 		{
 			this.needKnock = true;
@@ -344,15 +195,15 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 		}
 
 		//When no gems to fall - find gems to disappear
-		Map<GameObject, Integer> matchedInRows = this.findMatchedGemsInRows();
-		Map<GameObject, Integer> matchedInCols = this.findMatchedGemsInCols();
+		Map<GameObject, Integer> matchedInRows = this.field.findMatchedGemsInRows();
+		Map<GameObject, Integer> matchedInCols = this.field.findMatchedGemsInCols();
 		Map<GameObject, Integer> crossMatched = new HashMap<GameObject, Integer>();
 		for (GameObject obj: matchedInRows.keySet())
 		{
 			if (matchedInCols.containsKey(obj))
 			{
 				crossMatched.put(obj, matchedInRows.get(obj) + matchedInCols.get(obj));
-				obj.effect = 0;
+				obj.effect = CellObject.Effects.AREA;
 			}
 		}
 		for (GameObject obj: crossMatched.keySet())
@@ -374,17 +225,9 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 		
 		this.combo = 0;
 		
-		if (this.testNoMoves())
+		if (this.field.testNoMoves())
 		{
-			Set<GameObject> all = new HashSet<GameObject>();
-			for (int i = 0; i < this.field.size; ++i)
-			{
-				for (int j = 0; j < this.field.size; ++j)
-				{
-					all.add((GameObject)this.field.cells[i][j].object);
-				}
-			}
-			this.animations.add(new DisappearAnimation(all, this.gemSize, this));
+			this.animations.add(new DisappearAnimation(this.field.getAllGems(), this.gemSize, this));
 			return;
 		}
 		
@@ -394,18 +237,9 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 	@Override
 	public void swap(int i1, int j1, int i2, int j2)
 	{
-		this.swapObjects(i1, j1, i2, j2);
-		Map<GameObject, Integer> matchedInRows = this.findMatchedGemsInRows();
-		Map<GameObject, Integer> matchedInCols = this.findMatchedGemsInCols();
-		boolean success = matchedInRows.size() > 0 || matchedInCols.size() > 0;
-		GameObject obj1 = (GameObject)this.field.cells[i1][j1].object;
-		GameObject obj2 = (GameObject)this.field.cells[i2][j2].object;
-		this.animations.add(new SwapAnimation(obj1, obj2, !success, this));
-		if (!success)
-		{
-			this.swapObjects(i1, j1, i2, j2);
-		}
-		else
+		boolean success = this.field.testSwap(i1, j1, i2, j2);
+		this.animations.add(new SwapAnimation(this.field.getGem(i1, j1), this.field.getGem(i2, j2), !success, this));
+		if (success)
 		{
 			this.canMove = false;
 		}
@@ -417,17 +251,10 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 		if (animation.getClass() == DisappearAnimation.class)
 		{
 			DisappearAnimation disappearAnimation = (DisappearAnimation)animation;
-			for (int i = 0; i < this.field.size; ++i)
+			this.field.removeGems(disappearAnimation.gems);
+			for (GameObject gem: disappearAnimation.gems)
 			{
-				for (int j = 0; j < this.field.size; ++j)
-				{
-					CellObject thisGem = this.field.cells[i][j].object;
-					if (disappearAnimation.gems.contains(thisGem))
-					{
-						this.objects.remove(thisGem);
-						this.field.cells[i][j].object = null;
-					}
-				}
+				this.objects.remove(gem);
 			}
 		}
 		this.animations.remove(animation);
