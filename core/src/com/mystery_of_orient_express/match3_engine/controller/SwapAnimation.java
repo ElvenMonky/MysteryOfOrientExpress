@@ -8,12 +8,12 @@ public class SwapAnimation implements IAnimation
 	private static final float totalDuration = 0.1f;
 	private static final float totalDurationInv = 10.0f;
 	private IAnimationHandler handler;
-	private GameObject gem1;
-	private GameObject gem2;
+	public GameObject gem1;
+	public GameObject gem2;
 	private float currentDuration;
 	private float distanceX;
 	private float distanceY;
-	private boolean swapBack;
+	public boolean swapBack;
 	public SwapAnimation(GameObject gem1, GameObject gem2, boolean swapBack, IAnimationHandler handler)
 	{
 		this.handler = handler;

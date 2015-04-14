@@ -10,13 +10,15 @@ public class Field
 	private IGameObjectFactory objectFactory;
 	private IScoreController scoreController;
 	private int size;
+	private int kindsCount;
 	private Cell[][] cells;
 	private List<Match> rowMatches;
 	private List<Match> colMatches;
 
-	public Field(IGameObjectFactory objectFactory, IScoreController scoreController, int size)
+	public Field(IGameObjectFactory objectFactory, IScoreController scoreController, int size, int kindsCount)
 	{
 		this.size = size;
+		this.kindsCount = kindsCount;
 		this.objectFactory = objectFactory;
 		this.scoreController = scoreController;
 		this.cells = new Cell[this.size][this.size];
@@ -34,7 +36,7 @@ public class Field
 			}
 		}
 	}
-	
+
 	public boolean checkIndex(int index)
 	{
 		return 0 <= index && index < this.size;
@@ -54,37 +56,111 @@ public class Field
 		return null;
 	}
 
-	public GameObject getGem(int i,int j)
+	public CellObject getGem(int i,int j)
 	{
-		return (GameObject)this.cells[i][j].object;
+		return this.cells[i][j].object;
 	}
 
-	public Set<GameObject> getAllGems()
+	public Set<CellObject> getAllGems()
 	{
-		Set<GameObject> all = new HashSet<GameObject>();
+		Set<CellObject> all = new HashSet<CellObject>();
 		for (int i = 0; i < this.size; ++i)
 		{
 			for (int j = 0; j < this.size; ++j)
 			{
-				all.add((GameObject)this.cells[i][j].object);
+				CellObject gem = this.getGem(i, j);
+				if (gem != null)
+				{
+					all.add(gem);
+				}
 			}
 		}
 		return all;
 	}
 	
-	public void removeGems(Set<GameObject> gems)
+	public Set<CellObject> getAllGems(int kind)
 	{
+		Set<CellObject> all = new HashSet<CellObject>();
 		for (int i = 0; i < this.size; ++i)
 		{
 			for (int j = 0; j < this.size; ++j)
 			{
-				CellObject thisGem = this.cells[i][j].object;
-				if (gems.contains(thisGem))
+				CellObject gem = this.getGem(i, j);
+				if (gem != null && gem.kind == kind)
 				{
-					this.cells[i][j].object = null;
+					all.add(gem);
 				}
 			}
 		}
+		return all;
+	}
+
+	public Set<CellObject> removeGems(Set<CellObject> gems)
+	{
+		Set<CellObject> chained = new HashSet<CellObject>();
+		for (int i = 0; i < this.size; ++i)
+		{
+			for (int j = 0; j < this.size; ++j)
+			{
+				CellObject thisGem = this.getGem(i, j);
+				if (thisGem != null && gems.contains(thisGem))
+				{
+					this.cells[i][j].object = null;
+					if (thisGem.effect == CellObject.Effects.H_RAY)
+					{
+						for (int newI = 0; newI < this.size; ++newI)
+						{
+							CellObject gem = this.getGem(newI, j);
+							if (gem != null && gem.activity == -1)
+							{
+								chained.add(gem);
+							}
+						}
+					}
+					else if (thisGem.effect == CellObject.Effects.V_RAY)
+					{
+						for (int newJ = 0; newJ < this.size; ++newJ)
+						{
+							CellObject gem = this.getGem(i, newJ);
+							if (gem != null && gem.activity == -1)
+							{
+								chained.add(gem);
+							}
+						}
+					}
+					else if (thisGem.effect == CellObject.Effects.AREA)
+					{
+						for (int newI = Math.max(0, i - 1); newI <= Math.min(this.size - 1, i + 1); ++newI)
+						{
+							for (int newJ = Math.max(0, j - 1); newJ <= Math.min(this.size - 1, j + 1); ++newJ)
+							{
+								CellObject gem = this.getGem(newI, newJ);
+								if (gem != null && gem.activity == -1)
+								{
+									chained.add(gem);
+								}
+							}
+						}
+					}
+					else if (thisGem.effect == CellObject.Effects.KIND)
+					{
+						int kind = (int) (Math.random() * this.kindsCount);
+						for (int newI = 0; newI < this.size; ++newI)
+						{
+							for (int newJ = 0; newJ < this.size; ++newJ)
+							{
+								CellObject gem = this.getGem(newI, newJ);
+								if (gem != null && gem.activity == -1 && gem.kind == kind)
+								{
+									chained.add(gem);
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		return chained;
 	}
 
 	private void swapObjects(int i1, int j1, int i2, int j2)
@@ -129,9 +205,9 @@ public class Field
 		}
 	}
 
-	public Set<GameObject> findGemsToFall()
+	public Set<CellObject> findGemsToFall()
 	{
-		Set<GameObject> gemsToFall = new HashSet<GameObject>();
+		Set<CellObject> gemsToFall = new HashSet<CellObject>();
 		for (int i = 0; i < this.size; ++i)
 		{
 			for (int j = 0; j < this.size; ++j)
@@ -153,24 +229,24 @@ public class Field
 				if (thisGem == null)
 					continue;
 				
-				gemsToFall.add((GameObject)thisGem);
+				gemsToFall.add(thisGem);
 			}
 		}
 		return gemsToFall;
 	}
 
-	public Set<GameObject> findMatchedGems()
+	public Set<CellObject> findMatchedGems()
 	{
 		this.findMatchedGems(true);
 		this.findMatchedGems(false);
 		this.scoreController.updateCombo(this.rowMatches.size() + this.colMatches.size());
-		Set<GameObject> matchedAll = new HashSet<GameObject>();
+		Set<CellObject> matchedAll = new HashSet<CellObject>();
 		// Add all matched gems with effects
 		for (Match match: this.rowMatches)
 		{
 			for (int d = 0; d < match.length; ++d)
 			{
-				GameObject gem = this.getGem(match.i + d, match.j);
+				CellObject gem = this.getGem(match.i + d, match.j);
 				if (gem.effect != CellObject.Effects.NONE)
 				{
 					matchedAll.add(gem);
@@ -181,7 +257,7 @@ public class Field
 		{
 			for (int d = 0; d < match.length; ++d)
 			{
-				GameObject gem = this.getGem(match.i, match.j + d);
+				CellObject gem = this.getGem(match.i, match.j + d);
 				if (gem.effect != CellObject.Effects.NONE)
 				{
 					this.scoreController.updateScore(10);
@@ -198,7 +274,7 @@ public class Field
 					colMatch.j <= rowMatch.j && rowMatch.j < colMatch.j + colMatch.length)
 				{
 					this.scoreController.updateScore(rowMatch.length * (rowMatch.length - 2) * rowMatch.length * (colMatch.length - 2));
-					GameObject gem = this.getGem(colMatch.i, rowMatch.j);
+					CellObject gem = this.getGem(colMatch.i, rowMatch.j);
 					if (gem.effect == CellObject.Effects.NONE)
 					{
 						gem.effect = CellObject.Effects.AREA;
@@ -212,10 +288,10 @@ public class Field
 			this.scoreController.updateScore(match.length * (match.length - 1) * (match.length - 2) / 2);
 			if (match.length > 3)
 			{
-				List<GameObject> freeGems = new ArrayList<GameObject>();
+				List<CellObject> freeGems = new ArrayList<CellObject>();
 				for (int d = 0; d < match.length; ++d)
 				{
-					GameObject gem = this.getGem(match.i + d, match.j);
+					CellObject gem = this.getGem(match.i + d, match.j);
 					if (gem.effect == CellObject.Effects.NONE)
 					{
 						freeGems.add(gem);
@@ -223,8 +299,16 @@ public class Field
 				}
 				if (freeGems.size() > 0)
 				{
-					GameObject gem = freeGems.get((int)(Math.random() * freeGems.size()));
-					gem.effect = match.length == 4 ? CellObject.Effects.V_RAY : CellObject.Effects.KIND;
+					CellObject gem = freeGems.get((int)(Math.random() * freeGems.size()));
+					if (match.length == 4)
+					{
+						gem.effect = CellObject.Effects.V_RAY;
+					}
+					else
+					{
+						gem.effect = CellObject.Effects.KIND;
+						gem.kind = -1;
+					}
 				}
 			}
 		}
@@ -232,10 +316,10 @@ public class Field
 		{
 			if (match.length > 3)
 			{
-				List<GameObject> freeGems = new ArrayList<GameObject>();
+				List<CellObject> freeGems = new ArrayList<CellObject>();
 				for (int d = 0; d < match.length; ++d)
 				{
-					GameObject gem = this.getGem(match.i, match.j + d);
+					CellObject gem = this.getGem(match.i, match.j + d);
 					if (gem.effect == CellObject.Effects.NONE)
 					{
 						freeGems.add(gem);
@@ -243,7 +327,7 @@ public class Field
 				}
 				if (freeGems.size() > 0)
 				{
-					GameObject gem = freeGems.get((int)(Math.random() * freeGems.size()));
+					CellObject gem = freeGems.get((int)(Math.random() * freeGems.size()));
 					if (match.length == 4)
 					{
 						gem.effect = CellObject.Effects.H_RAY;
@@ -261,7 +345,7 @@ public class Field
 		{
 			for (int d = 0; d < match.length; ++d)
 			{
-				GameObject gem = this.getGem(match.i + d, match.j);
+				CellObject gem = this.getGem(match.i + d, match.j);
 				if (gem.effect == CellObject.Effects.NONE)
 				{
 					matchedAll.add(gem);
@@ -272,7 +356,7 @@ public class Field
 		{
 			for (int d = 0; d < match.length; ++d)
 			{
-				GameObject gem = this.getGem(match.i, match.j + d);
+				CellObject gem = this.getGem(match.i, match.j + d);
 				if (gem.effect == CellObject.Effects.NONE)
 				{
 					matchedAll.add(gem);
@@ -284,6 +368,17 @@ public class Field
 
 	public boolean testNoMoves()
 	{
+		// TODO test for gem pairs with effects
+		for (int i = 0; i < this.size; ++i)
+		{
+			for (int j = 0; j < this.size; ++j)
+			{
+				CellObject thisGem = this.cells[i][j].object;
+				if (thisGem.effect == CellObject.Effects.KIND)
+					return false;
+			}
+		}
+
 		for (int i = 0; i < this.size; ++i)
 		{
 			for (int j = 1; j < this.size - 1; ++j)
@@ -333,12 +428,12 @@ public class Field
 		}
 		return true;
 	}
-	
+
 	public boolean testSwap(int i1, int j1, int i2, int j2)
 	{
 		this.swapObjects(i1, j1, i2, j2);
-		GameObject obj1 = this.getGem(i1, j1);
-		GameObject obj2 = this.getGem(i2, j2);
+		CellObject obj1 = this.getGem(i1, j1);
+		CellObject obj2 = this.getGem(i2, j2);
 		this.findMatchedGems(true);
 		this.findMatchedGems(false);
 		boolean success = this.rowMatches.size() > 0 || this.colMatches.size() > 0 ||

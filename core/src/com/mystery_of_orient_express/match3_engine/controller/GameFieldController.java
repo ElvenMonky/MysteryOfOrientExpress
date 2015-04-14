@@ -1,6 +1,7 @@
 package com.mystery_of_orient_express.match3_engine.controller;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -51,7 +52,7 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 		this.objects.clear();
 		this.gameInputProcessor = new GameInputProcessor(this, this.cellSize,
 				(minScreenSize - fieldSize * this.cellSize) / 2);
-		this.field = new Field(this, this.scoreController, fieldSize);
+		this.field = new Field(this, this.scoreController, fieldSize, GameFieldController.gemNames.length);
 	}
 
 	@Override
@@ -171,7 +172,7 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 			return;
 
 		//If there is gems to fall - make them all fall first
-		Set<GameObject> gemsToFall = this.field.findGemsToFall();
+		Set<CellObject> gemsToFall = this.field.findGemsToFall();
 		if (gemsToFall.size() > 0)
 		{
 			this.needKnock = true;
@@ -187,7 +188,7 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 		}
 
 		//When no gems to fall - find gems to disappear
-		Set<GameObject> matchedAll = this.field.findMatchedGems();
+		Set<CellObject> matchedAll = this.field.findMatchedGems();
 		if (matchedAll.size() > 0)
 		{
 			// TODO add effect animations for gems with effects
@@ -209,7 +210,7 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 	public void swap(int i1, int j1, int i2, int j2)
 	{
 		boolean success = this.field.testSwap(i1, j1, i2, j2);
-		this.animations.add(new SwapAnimation(this.field.getGem(i1, j1), this.field.getGem(i2, j2), !success, this));
+		this.animations.add(new SwapAnimation((GameObject)this.field.getGem(i1, j1), (GameObject)this.field.getGem(i2, j2), !success, this));
 		if (success)
 		{
 			this.canMove = false;
@@ -222,10 +223,114 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 		if (animation.getClass() == DisappearAnimation.class)
 		{
 			DisappearAnimation disappearAnimation = (DisappearAnimation)animation;
-			this.field.removeGems(disappearAnimation.gems);
-			for (GameObject gem: disappearAnimation.gems)
+			Set<CellObject> chained = this.field.removeGems(disappearAnimation.gems);
+			if (chained.size() > 0)
+			{
+				this.animations.add(new DisappearAnimation(chained, this.gemSize, this));
+			}
+			for (CellObject gem: disappearAnimation.gems)
 			{
 				this.objects.remove(gem);
+			}
+		}
+		if (animation.getClass() == SwapAnimation.class)
+		{
+			SwapAnimation swapAnimation = (SwapAnimation)animation;
+			if (!swapAnimation.swapBack)
+			{
+				if (swapAnimation.gem1.effect == CellObject.Effects.KIND)
+				{
+					if (swapAnimation.gem2.effect == CellObject.Effects.KIND)
+					{
+						Set<CellObject> all = this.field.getAllGems();
+						this.animations.add(new DisappearAnimation(all, this.gemSize, this));
+					}
+					else
+					{
+						Set<CellObject> allOfKind = this.field.getAllGems(swapAnimation.gem2.kind);
+						if (swapAnimation.gem2.effect == CellObject.Effects.AREA)
+						{
+							for (CellObject gem: allOfKind)
+							{
+								gem.effect = CellObject.Effects.AREA;
+							}
+						}
+						else if (swapAnimation.gem2.effect != CellObject.Effects.NONE)
+						{
+							for (CellObject gem: allOfKind)
+							{
+								if (gem != swapAnimation.gem2)
+								{
+									gem.effect = Math.random() >= 0.5f ? CellObject.Effects.H_RAY : CellObject.Effects.V_RAY;
+								}
+							}
+						}
+						allOfKind.add(swapAnimation.gem1);
+						this.animations.add(new DisappearAnimation(allOfKind, this.gemSize, this));
+					}
+				}
+				else if (swapAnimation.gem2.effect == CellObject.Effects.KIND)
+				{
+					Set<CellObject> allOfKind = this.field.getAllGems(swapAnimation.gem1.kind);
+					if (swapAnimation.gem1.effect == CellObject.Effects.AREA)
+					{
+						for (CellObject gem: allOfKind)
+						{
+							gem.effect = CellObject.Effects.AREA;
+						}
+					}
+					else if (swapAnimation.gem1.effect != CellObject.Effects.NONE)
+					{
+						for (CellObject gem: allOfKind)
+						{
+							if (gem != swapAnimation.gem1)
+							{
+								gem.effect = Math.random() >= 0.5f ? CellObject.Effects.H_RAY : CellObject.Effects.V_RAY;
+							}
+						}
+					}
+					allOfKind.add(swapAnimation.gem2);
+					this.animations.add(new DisappearAnimation(allOfKind, this.gemSize, this));
+				}
+				else if (swapAnimation.gem1.effect == CellObject.Effects.AREA)
+				{
+					if (swapAnimation.gem2.effect == CellObject.Effects.AREA)
+					{
+						Set<CellObject> gems = new HashSet<CellObject>();
+						// TODO remove 5x5 block
+						gems.add(swapAnimation.gem1);
+						gems.add(swapAnimation.gem2);
+						this.animations.add(new DisappearAnimation(gems, this.gemSize, this));
+					}
+					else if (swapAnimation.gem2.effect != CellObject.Effects.NONE)
+					{
+						Set<CellObject> gems = new HashSet<CellObject>();
+						// TODO remove 3 rows or 3 columns
+						gems.add(swapAnimation.gem1);
+						gems.add(swapAnimation.gem2);
+						this.animations.add(new DisappearAnimation(gems, this.gemSize, this));
+					}
+				}
+				else if (swapAnimation.gem2.effect == CellObject.Effects.AREA)
+				{
+					if (swapAnimation.gem1.effect != CellObject.Effects.NONE)
+					{
+						Set<CellObject> gems = new HashSet<CellObject>();
+						// TODO remove 3 rows or 3 columns
+						gems.add(swapAnimation.gem1);
+						gems.add(swapAnimation.gem2);
+						this.animations.add(new DisappearAnimation(gems, this.gemSize, this));
+					}
+				}
+				else if (swapAnimation.gem1.effect != CellObject.Effects.NONE &&
+						swapAnimation.gem2.effect != CellObject.Effects.NONE)
+				{
+					Set<CellObject> gems = new HashSet<CellObject>();
+					// TODO remove 1 row and 1 column
+					gems.add(swapAnimation.gem1);
+					gems.add(swapAnimation.gem2);
+					this.animations.add(new DisappearAnimation(gems, this.gemSize, this));
+				}
 			}
 		}
 		this.animations.remove(animation);

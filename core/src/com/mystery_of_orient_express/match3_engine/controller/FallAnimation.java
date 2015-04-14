@@ -2,6 +2,7 @@ package com.mystery_of_orient_express.match3_engine.controller;
 
 import java.util.Set;
 
+import com.mystery_of_orient_express.match3_engine.model.CellObject;
 import com.mystery_of_orient_express.match3_engine.model.GameObject;
 import com.mystery_of_orient_express.match3_engine.model.IAnimation;
 
@@ -10,15 +11,15 @@ public class FallAnimation implements IAnimation
 	private static final float totalDuration = 0.0666666f;
 	private static final float totalDurationInv = 15.0f;
 	private IAnimationHandler handler;
-	public Set<GameObject> gems;
-	private GameObject[] gemsArray;
+	public Set<CellObject> gems;
+	private CellObject[] gemsArray;
 	private float currentDuration;
 	private float fallLength;
-	public FallAnimation(Set<GameObject> gems, float fallLength, IAnimationHandler handler)
+	public FallAnimation(Set<CellObject> gems, float fallLength, IAnimationHandler handler)
 	{
 		this.handler = handler;
 		this.gems = gems;
-		this.gemsArray = gems.toArray(new GameObject[gems.size()]);
+		this.gemsArray = gems.toArray(new CellObject[gems.size()]);
 		for (int index = 0; index < this.gemsArray.length; ++index)
 		{
 			this.gemsArray[index].activity = 0;
@@ -35,7 +36,7 @@ public class FallAnimation implements IAnimation
 		float deltaLength = this.fallLength * currentDelta * FallAnimation.totalDurationInv;
 		for (int index = 0; index < this.gemsArray.length; ++index)
 		{
-			this.gemsArray[index].posY -= deltaLength;
+			((GameObject)this.gemsArray[index]).posY -= deltaLength;
 		}
 		this.currentDuration += delta;
 		if (this.currentDuration >= FallAnimation.totalDuration)
