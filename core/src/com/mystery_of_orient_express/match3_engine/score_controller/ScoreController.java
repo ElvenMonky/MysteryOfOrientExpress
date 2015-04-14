@@ -5,8 +5,9 @@ import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.mystery_of_orient_express.match3_engine.model.IGameController;
+import com.mystery_of_orient_express.match3_engine.model.IScoreController;
 
-public class ScoreController implements IGameController
+public class ScoreController implements IGameController, IScoreController
 {
 	private static final String[] digitNames = {
 		"score_zero.png", "score_one.png", "score_two.png", "score_three.png", "score_four.png",
@@ -16,7 +17,8 @@ public class ScoreController implements IGameController
 	
 	private static final int scoreDigits = 8; 
 	
-	private int score;
+	private int score = 0;
+	private int combo = 0;
 	
 	private int minScreenSize;
 	private int screenWidth;
@@ -26,11 +28,9 @@ public class ScoreController implements IGameController
 	private int y;
 	private int scoreCellSize;
 	private int scoreHeight;
-	
+
 	public ScoreController(int minScreenSize, int screenWidth, int screenHeight)
 	{
-		this.score = 7350648;
-
 		this.screenWidth = screenWidth;
 		this.screenHeight = screenHeight;
 		this.minScreenSize = minScreenSize;
@@ -41,11 +41,18 @@ public class ScoreController implements IGameController
 		this.scoreHeight = 96;
 	}
 	
-	public void updateScore()
+	@Override
+	public void updateCombo(int matches)
 	{
-		// TODO Add parameters and call from GameFieldController to update score
+		this.combo = matches == 0 ? 0 : this.combo + matches;
 	}
-	
+
+	@Override
+	public void updateScore(int score)
+	{
+		this.score += this.combo * score;
+	}
+
 	@Override
 	public void load(AssetManager assetManager)
 	{
@@ -82,5 +89,10 @@ public class ScoreController implements IGameController
 	public InputProcessor getInputProcessor()
 	{
 		return null;
+	}
+	
+	public int getCombo()
+	{
+		return this.combo;
 	}
 }

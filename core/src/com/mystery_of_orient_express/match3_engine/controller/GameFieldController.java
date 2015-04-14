@@ -1,10 +1,7 @@
 package com.mystery_of_orient_express.match3_engine.controller;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import com.badlogic.gdx.InputProcessor;
@@ -41,7 +38,6 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 	
 	private boolean canMove = false;
 	private boolean needKnock = false;
-	private int combo = 0;
 
 	public GameFieldController(ScoreController scoreController, int minScreenSize)
 	{
@@ -55,7 +51,7 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 		this.objects.clear();
 		this.gameInputProcessor = new GameInputProcessor(this, this.cellSize,
 				(minScreenSize - fieldSize * this.cellSize) / 2);
-		this.field = new Field(this, fieldSize);
+		this.field = new Field(this, this.scoreController, fieldSize);
 	}
 
 	@Override
@@ -108,17 +104,13 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 			}
 			else if (obj.effect == CellObject.Effects.H_RAY)
 			{
-				batch.draw(image, minX - 15, minY, obj.sizeX, obj.sizeY);
-				batch.draw(image, minX - 05, minY, obj.sizeX, obj.sizeY);
-				batch.draw(image, minX + 05, minY, obj.sizeX, obj.sizeY);
-				batch.draw(image, minX + 15, minY, obj.sizeX, obj.sizeY);
+				batch.draw(image, minX - 10, minY, obj.sizeX, obj.sizeY);
+				batch.draw(image, minX + 10, minY, obj.sizeX, obj.sizeY);
 			}
 			else if (obj.effect == CellObject.Effects.V_RAY)
 			{
-				batch.draw(image, minX, minY - 15, obj.sizeX, obj.sizeY);
-				batch.draw(image, minX, minY - 05, obj.sizeX, obj.sizeY);
-				batch.draw(image, minX, minY + 05, obj.sizeX, obj.sizeY);
-				batch.draw(image, minX, minY + 15, obj.sizeX, obj.sizeY);
+				batch.draw(image, minX, minY - 10, obj.sizeX, obj.sizeY);
+				batch.draw(image, minX, minY + 10, obj.sizeX, obj.sizeY);
 			}
 			batch.draw(image, minX, minY, obj.sizeX, obj.sizeY);
 		}
@@ -132,8 +124,8 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 			for (int i = 0; i < GameFieldController.gemNames.length; ++i)
 			{
 				image = assetManager.get(GameFieldController.gemNames[i], Texture.class);
-				batch.draw(image, obj.posX - dX + sX * (float)Math.sin(i * a),
-						obj.posY - dY + sY * (float)Math.sin(i * a), sX, sY);
+				batch.draw(image, obj.posX - dX + dX * (float)Math.sin(i * a),
+						obj.posY - dY + dY * (float)Math.cos(i * a), sX, sY);
 			}
 		}
 	}
@@ -195,35 +187,14 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 		}
 
 		//When no gems to fall - find gems to disappear
-		Map<GameObject, Integer> matchedInRows = this.field.findMatchedGemsInRows();
-		Map<GameObject, Integer> matchedInCols = this.field.findMatchedGemsInCols();
-		Map<GameObject, Integer> crossMatched = new HashMap<GameObject, Integer>();
-		for (GameObject obj: matchedInRows.keySet())
+		Set<GameObject> matchedAll = this.field.findMatchedGems();
+		if (matchedAll.size() > 0)
 		{
-			if (matchedInCols.containsKey(obj))
-			{
-				crossMatched.put(obj, matchedInRows.get(obj) + matchedInCols.get(obj));
-				obj.effect = CellObject.Effects.AREA;
-			}
-		}
-		for (GameObject obj: crossMatched.keySet())
-		{
-			matchedInRows.remove(obj);
-			matchedInCols.remove(obj);
-		}
-		if (matchedInRows.size() > 0 || matchedInCols.size() > 0)
-		{
-			++this.combo;
-			scoreController.updateScore();
-			Set<GameObject> matchedAll = new HashSet<GameObject>();
-			matchedAll.addAll(matchedInRows.keySet());
-			matchedAll.addAll(matchedInCols.keySet());
+			// TODO add effect animations for gems with effects
 			this.animations.add(new DisappearAnimation(matchedAll, this.gemSize, this));
-			assetManager.get(GameFieldController.soundNames[Math.min(this.combo, 2)], Sound.class).play(0.01f);
+			assetManager.get(GameFieldController.soundNames[Math.min(this.scoreController.getCombo(), 2)], Sound.class).play(0.01f);
 			return;
 		}
-		
-		this.combo = 0;
 		
 		if (this.field.testNoMoves())
 		{

@@ -1,21 +1,27 @@
 package com.mystery_of_orient_express.match3_engine.model;
 
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Map;
+import java.util.List;
 import java.util.Set;
 
 public class Field
 {
 	private IGameObjectFactory objectFactory;
+	private IScoreController scoreController;
 	private int size;
 	private Cell[][] cells;
-	
-	public Field(IGameObjectFactory objectFactory, int size)
+	private List<Match> rowMatches;
+	private List<Match> colMatches;
+
+	public Field(IGameObjectFactory objectFactory, IScoreController scoreController, int size)
 	{
 		this.size = size;
 		this.objectFactory = objectFactory;
+		this.scoreController = scoreController;
 		this.cells = new Cell[this.size][this.size];
+		this.rowMatches = new ArrayList<Match>();
+		this.colMatches = new ArrayList<Match>();
 		for (int i = 0; i < this.size; ++i)
 		{
 			for (int j = 0; j < this.size; ++j)
@@ -34,13 +40,6 @@ public class Field
 		return 0 <= index && index < this.size;
 	}
 
-	private static boolean match3(CellObject prevGem, CellObject thisGem, CellObject nextGem)
-	{
-		return thisGem != null && prevGem != null && nextGem != null &&
-				thisGem.kind != -1 && prevGem.kind != -1 && nextGem.kind != -1 &&
-				prevGem.kind == thisGem.kind && thisGem.kind == nextGem.kind;
-	}
-
 	private static Integer match2(CellObject prevGem, CellObject thisGem, CellObject nextGem)
 	{
 		if (thisGem == null || prevGem == null || nextGem == null ||
@@ -54,17 +53,12 @@ public class Field
 			return 0;
 		return null;
 	}
-	
-	private static void addGemToMap(Map<GameObject, Integer> map, GameObject gem)
-	{
-		map.put(gem, map.containsKey(gem) ? map.get(gem) + 1 : 0);
-	}
-	
+
 	public GameObject getGem(int i,int j)
 	{
 		return (GameObject)this.cells[i][j].object;
 	}
-	
+
 	public Set<GameObject> getAllGems()
 	{
 		Set<GameObject> all = new HashSet<GameObject>();
@@ -100,46 +94,39 @@ public class Field
 		this.cells[i2][j2].object = cellObject;
 	}
 
-	public Map<GameObject, Integer> findMatchedGemsInRows()
+	private void findMatchedGems(boolean rows)
 	{
-		Map<GameObject, Integer> matched = new HashMap<GameObject, Integer>();
-		for (int j = 0; j < this.size; ++j)
+		List<Match> matched = rows ? this.rowMatches : this.colMatches;
+		matched.clear();
+		Match current;
+		for (int outer = 0; outer < this.size; ++outer)
 		{
-			for (int i = 1; i < this.size - 1; ++i)
+			current = new Match();
+			for (int inner = 0; inner < this.size; ++inner)
 			{
-				CellObject prevGem = this.cells[i - 1][j].object;
-				CellObject thisGem = this.cells[i * 1][j].object;
-				CellObject nextGem = this.cells[i + 1][j].object;
-				if (Field.match3(prevGem, thisGem, nextGem))
+				CellObject gem = this.cells[rows ? inner : outer][rows ? outer : inner].object;
+				boolean validGem = gem != null && gem.activity == -1 && gem.kind >= 0;
+				if (validGem && gem.kind == current.kind)
 				{
-					Field.addGemToMap(matched, (GameObject)prevGem);
-					Field.addGemToMap(matched, (GameObject)thisGem);
-					Field.addGemToMap(matched, (GameObject)nextGem);
+					++current.length;
+					if (current.length == 3)
+					{
+						current.i = rows ? inner - 2 : outer;
+						current.j = rows ? outer : inner - 2;
+						matched.add(current);
+					}
+				}
+				else
+				{
+					if (current.length >= 3)
+					{
+						current = new Match();
+					}
+					current.length = validGem ? 1 : 0;
+					current.kind = validGem ? gem.kind : -1;
 				}
 			}
 		}
-		return matched;
-	}
-
-	public Map<GameObject, Integer> findMatchedGemsInCols()
-	{
-		Map<GameObject, Integer> matched = new HashMap<GameObject, Integer>();
-		for (int i = 0; i < this.size; ++i)
-		{
-			for (int j = 1; j < this.size - 1; ++j)
-			{
-				CellObject prevGem = this.cells[i][j - 1].object;
-				CellObject thisGem = this.cells[i][j * 1].object;
-				CellObject nextGem = this.cells[i][j + 1].object;
-				if (Field.match3(prevGem, thisGem, nextGem))
-				{
-					Field.addGemToMap(matched, (GameObject)prevGem);
-					Field.addGemToMap(matched, (GameObject)thisGem);
-					Field.addGemToMap(matched, (GameObject)nextGem);
-				}
-			}
-		}
-		return matched;
 	}
 
 	public Set<GameObject> findGemsToFall()
@@ -170,6 +157,129 @@ public class Field
 			}
 		}
 		return gemsToFall;
+	}
+
+	public Set<GameObject> findMatchedGems()
+	{
+		this.findMatchedGems(true);
+		this.findMatchedGems(false);
+		this.scoreController.updateCombo(this.rowMatches.size() + this.colMatches.size());
+		Set<GameObject> matchedAll = new HashSet<GameObject>();
+		// Add all matched gems with effects
+		for (Match match: this.rowMatches)
+		{
+			for (int d = 0; d < match.length; ++d)
+			{
+				GameObject gem = this.getGem(match.i + d, match.j);
+				if (gem.effect != CellObject.Effects.NONE)
+				{
+					matchedAll.add(gem);
+				}
+			}
+		}
+		for (Match match: this.colMatches)
+		{
+			for (int d = 0; d < match.length; ++d)
+			{
+				GameObject gem = this.getGem(match.i, match.j + d);
+				if (gem.effect != CellObject.Effects.NONE)
+				{
+					this.scoreController.updateScore(10);
+					matchedAll.add(gem);
+				}
+			}
+		}
+		// Mark with AREA effect all cross matched gems without effect
+		for (Match rowMatch: this.rowMatches)
+		{
+			for (Match colMatch: this.colMatches)
+			{
+				if (rowMatch.i <= colMatch.i && colMatch.i < rowMatch.i + rowMatch.length &&
+					colMatch.j <= rowMatch.j && rowMatch.j < colMatch.j + colMatch.length)
+				{
+					this.scoreController.updateScore(rowMatch.length * (rowMatch.length - 2) * rowMatch.length * (colMatch.length - 2));
+					GameObject gem = this.getGem(colMatch.i, rowMatch.j);
+					if (gem.effect == CellObject.Effects.NONE)
+					{
+						gem.effect = CellObject.Effects.AREA;
+					}
+				}
+			}
+		}
+		// Mark one random gem among long matches with some effect 
+		for (Match match: this.rowMatches)
+		{
+			this.scoreController.updateScore(match.length * (match.length - 1) * (match.length - 2) / 2);
+			if (match.length > 3)
+			{
+				List<GameObject> freeGems = new ArrayList<GameObject>();
+				for (int d = 0; d < match.length; ++d)
+				{
+					GameObject gem = this.getGem(match.i + d, match.j);
+					if (gem.effect == CellObject.Effects.NONE)
+					{
+						freeGems.add(gem);
+					}
+				}
+				if (freeGems.size() > 0)
+				{
+					GameObject gem = freeGems.get((int)(Math.random() * freeGems.size()));
+					gem.effect = match.length == 4 ? CellObject.Effects.V_RAY : CellObject.Effects.KIND;
+				}
+			}
+		}
+		for (Match match: this.colMatches)
+		{
+			if (match.length > 3)
+			{
+				List<GameObject> freeGems = new ArrayList<GameObject>();
+				for (int d = 0; d < match.length; ++d)
+				{
+					GameObject gem = this.getGem(match.i, match.j + d);
+					if (gem.effect == CellObject.Effects.NONE)
+					{
+						freeGems.add(gem);
+					}
+				}
+				if (freeGems.size() > 0)
+				{
+					GameObject gem = freeGems.get((int)(Math.random() * freeGems.size()));
+					if (match.length == 4)
+					{
+						gem.effect = CellObject.Effects.H_RAY;
+					}
+					else
+					{
+						gem.effect = CellObject.Effects.KIND;
+						gem.kind = -1;
+					}
+				}
+			}
+		}
+		// Add all matched gems without effects
+		for (Match match: this.rowMatches)
+		{
+			for (int d = 0; d < match.length; ++d)
+			{
+				GameObject gem = this.getGem(match.i + d, match.j);
+				if (gem.effect == CellObject.Effects.NONE)
+				{
+					matchedAll.add(gem);
+				}
+			}
+		}
+		for (Match match: this.colMatches)
+		{
+			for (int d = 0; d < match.length; ++d)
+			{
+				GameObject gem = this.getGem(match.i, match.j + d);
+				if (gem.effect == CellObject.Effects.NONE)
+				{
+					matchedAll.add(gem);
+				}
+			}
+		}
+		return matchedAll;
 	}
 
 	public boolean testNoMoves()
@@ -229,9 +339,9 @@ public class Field
 		this.swapObjects(i1, j1, i2, j2);
 		GameObject obj1 = this.getGem(i1, j1);
 		GameObject obj2 = this.getGem(i2, j2);
-		Map<GameObject, Integer> matchedInRows = this.findMatchedGemsInRows();
-		Map<GameObject, Integer> matchedInCols = this.findMatchedGemsInCols();
-		boolean success = matchedInRows.size() > 0 || matchedInCols.size() > 0 ||
+		this.findMatchedGems(true);
+		this.findMatchedGems(false);
+		boolean success = this.rowMatches.size() > 0 || this.colMatches.size() > 0 ||
 				obj1.effect == CellObject.Effects.KIND || obj2.effect == CellObject.Effects.KIND ||
 				(obj1.effect != CellObject.Effects.NONE && obj2.effect != CellObject.Effects.NONE);
 		if (!success)
