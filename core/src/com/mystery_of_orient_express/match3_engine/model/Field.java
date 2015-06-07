@@ -36,6 +36,11 @@ public class Field
 			}
 		}
 	}
+	
+	public int getSize()
+	{
+		return this.size;
+	}
 
 	public boolean checkIndex(int index)
 	{

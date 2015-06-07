@@ -1,4 +1,4 @@
-package com.mystery_of_orient_express.match3_engine.controller;
+package com.mystery_of_orient_express.match3_engine.view;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -10,20 +10,25 @@ import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.mystery_of_orient_express.match3_engine.controller.DisappearAnimation;
+import com.mystery_of_orient_express.match3_engine.controller.FallAnimation;
+import com.mystery_of_orient_express.match3_engine.controller.GameInputProcessor;
+import com.mystery_of_orient_express.match3_engine.controller.IAnimationHandler;
+import com.mystery_of_orient_express.match3_engine.controller.IGameFieldInputController;
+import com.mystery_of_orient_express.match3_engine.controller.SwapAnimation;
 import com.mystery_of_orient_express.match3_engine.model.CellObject;
 import com.mystery_of_orient_express.match3_engine.model.Field;
 import com.mystery_of_orient_express.match3_engine.model.GameObject;
 import com.mystery_of_orient_express.match3_engine.model.IAnimation;
-import com.mystery_of_orient_express.match3_engine.model.IGameController;
+import com.mystery_of_orient_express.match3_engine.model.IGameControl;
 import com.mystery_of_orient_express.match3_engine.model.IGameObjectFactory;
-import com.mystery_of_orient_express.match3_engine.score_controller.ScoreController;
 
-public class GameFieldController implements IGameController, IAnimationHandler, IGameFieldInputController, IGameObjectFactory
+public class GameFieldControl implements IGameControl, IAnimationHandler, IGameFieldInputController, IGameObjectFactory
 {
 	private static final String[] gemNames = { "gem_yellow.png", "gem_red.png", "gem_green.png", "gem_blue.png", "gem_purple.png", "gem_white.png" };
 	private static final String[] soundNames = { "knock.wav", "mystery3_3.wav", "mystery3_4.wav" };
 
-	private ScoreController scoreController;
+	private ScoreControl scoreControl;
 	
 	//Field coordinates
 	private Field field;
@@ -33,40 +38,44 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 
 	//Screen coordinates
 	private GameInputProcessor gameInputProcessor;
-	private int minScreenSize;
-	private int cellSize;
-	private int gemSize;
+	private int boardSize;
+	private static final float cellSize = 1;
+	private static final float gemSize = 1;
 	
 	private boolean canMove = false;
 	private boolean needKnock = false;
 
-	public GameFieldController(ScoreController scoreController, int minScreenSize)
+	public GameFieldControl(ScoreControl scoreControl, int fieldSize)
 	{
-		this.scoreController = scoreController;
-
-		this.minScreenSize = minScreenSize;
-		this.cellSize = 96;
-		this.gemSize = 96;
-		int fieldSize = (minScreenSize - 16) / this.cellSize;
+		this.scoreControl = scoreControl;
 
 		this.objects.clear();
-		this.gameInputProcessor = new GameInputProcessor(this, this.cellSize,
-				(minScreenSize - fieldSize * this.cellSize) / 2);
-		this.field = new Field(this, this.scoreController, fieldSize, GameFieldController.gemNames.length);
+		this.gameInputProcessor = new GameInputProcessor(this);
+		this.field = new Field(this, this.scoreControl, fieldSize, GameFieldControl.gemNames.length);
 	}
 
 	@Override
 	public void load(AssetManager assetManager)
 	{
 		assetManager.load("field.png", Texture.class);
-		for (String name: GameFieldController.gemNames)
+		for (String name: GameFieldControl.gemNames)
 		{
 			assetManager.load(name, Texture.class);
 		}
-		for (String name: GameFieldController.soundNames)
+		for (String name: GameFieldControl.soundNames)
 		{
 			assetManager.load(name, Sound.class);
 		}
+	}
+
+	@Override
+	public void resize(int x, int y, int width, int height)
+	{
+		this.boardSize = width;
+		int fieldSize = this.field.getSize();
+		int cellSize = (int)(0.96 * width / fieldSize);
+		int boardOffset = (width - cellSize * fieldSize) / 2;
+		this.gameInputProcessor.resize(cellSize, x, y, boardOffset);
 	}
 
 	@Override
@@ -81,11 +90,18 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 		this.updateFieldState(assetManager);
 
 		Texture boardImage = assetManager.get("field.png");
-		batch.draw(boardImage, 0, 0, this.minScreenSize, this.minScreenSize);
+		batch.draw(boardImage, this.gameInputProcessor.getOffset(true),
+				this.gameInputProcessor.getOffset(false), this.boardSize, this.boardSize);
 		for (int index = 0; index < this.objects.size(); ++index)
 		{
 			this.drawObject(batch, assetManager, this.objects.get(index));
 		}
+	}
+	
+	private void drawImage(SpriteBatch batch, Texture image, float x, float y, float width, float height)
+	{
+		batch.draw(image, this.gameInputProcessor.indexToCoord(x, true), this.gameInputProcessor.indexToCoord(y, false),
+				this.gameInputProcessor.sizeToCoord(width), this.gameInputProcessor.sizeToCoord(height));
 	}
 
 	public void drawObject(SpriteBatch batch, AssetManager assetManager, GameObject obj)
@@ -93,27 +109,27 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 		Texture image = null;
 		if (obj.kind != -1)
 		{
-			image = assetManager.get(GameFieldController.gemNames[obj.kind], Texture.class);
+			image = assetManager.get(GameFieldControl.gemNames[obj.kind], Texture.class);
 			float minX = obj.posX - 0.5f * obj.sizeX;
 			float minY = obj.posY - 0.5f * obj.sizeY;
 			if (obj.effect == CellObject.Effects.AREA)
 			{
-				batch.draw(image, minX - 10, minY, obj.sizeX, obj.sizeY);
-				batch.draw(image, minX, minY - 10, obj.sizeX, obj.sizeY);
-				batch.draw(image, minX + 10, minY, obj.sizeX, obj.sizeY);
-				batch.draw(image, minX, minY + 10, obj.sizeX, obj.sizeY);
+				this.drawImage(batch, image, minX - 0.1f, minY, obj.sizeX, obj.sizeY);
+				this.drawImage(batch, image, minX, minY - 0.1f, obj.sizeX, obj.sizeY);
+				this.drawImage(batch, image, minX + 0.1f, minY, obj.sizeX, obj.sizeY);
+				this.drawImage(batch, image, minX, minY + 0.1f, obj.sizeX, obj.sizeY);
 			}
 			else if (obj.effect == CellObject.Effects.H_RAY)
 			{
-				batch.draw(image, minX - 10, minY, obj.sizeX, obj.sizeY);
-				batch.draw(image, minX + 10, minY, obj.sizeX, obj.sizeY);
+				this.drawImage(batch, image, minX - 0.1f, minY, obj.sizeX, obj.sizeY);
+				this.drawImage(batch, image, minX + 0.1f, minY, obj.sizeX, obj.sizeY);
 			}
 			else if (obj.effect == CellObject.Effects.V_RAY)
 			{
-				batch.draw(image, minX, minY - 10, obj.sizeX, obj.sizeY);
-				batch.draw(image, minX, minY + 10, obj.sizeX, obj.sizeY);
+				this.drawImage(batch, image, minX, minY - 0.1f, obj.sizeX, obj.sizeY);
+				this.drawImage(batch, image, minX, minY + 0.1f, obj.sizeX, obj.sizeY);
 			}
-			batch.draw(image, minX, minY, obj.sizeX, obj.sizeY);
+			this.drawImage(batch, image, minX, minY, obj.sizeX, obj.sizeY);
 		}
 		else if (obj.effect == CellObject.Effects.KIND)
 		{
@@ -121,11 +137,11 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 			float sY = 0.5f * obj.sizeY;
 			float dX = 0.5f * sX;
 			float dY = 0.5f * sY;
-			double a = 2 * Math.PI / GameFieldController.gemNames.length;
-			for (int i = 0; i < GameFieldController.gemNames.length; ++i)
+			double a = 2 * Math.PI / GameFieldControl.gemNames.length;
+			for (int i = 0; i < GameFieldControl.gemNames.length; ++i)
 			{
-				image = assetManager.get(GameFieldController.gemNames[i], Texture.class);
-				batch.draw(image, obj.posX - dX + dX * (float)Math.sin(i * a),
+				image = assetManager.get(GameFieldControl.gemNames[i], Texture.class);
+				this.drawImage(batch, image, obj.posX - dX + dX * (float)Math.sin(i * a),
 						obj.posY - dY + dY * (float)Math.cos(i * a), sX, sY);
 			}
 		}
@@ -159,8 +175,8 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 	@Override
 	public GameObject newGem(int i, int j)
 	{
-		int kind = (int)(Math.random() * GameFieldController.gemNames.length);
-		GameObject newGem = new GameObject(kind, this.gameInputProcessor.indexToCoord(i), this.gameInputProcessor.indexToCoord(j), this.gemSize, this.gemSize);
+		int kind = (int)(Math.random() * GameFieldControl.gemNames.length);
+		GameObject newGem = new GameObject(kind, i, j, GameFieldControl.gemSize, GameFieldControl.gemSize);
 		this.objects.add(newGem);
 		return newGem;
 	}
@@ -176,7 +192,7 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 		if (gemsToFall.size() > 0)
 		{
 			this.needKnock = true;
-			this.animations.add(new FallAnimation(gemsToFall, this.cellSize, this));
+			this.animations.add(new FallAnimation(gemsToFall, GameFieldControl.cellSize, this));
 			return;
 		}
 
@@ -184,7 +200,7 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 		if (this.needKnock)
 		{
 			this.needKnock = false;
-			assetManager.get(GameFieldController.soundNames[0], Sound.class).play();
+			assetManager.get(GameFieldControl.soundNames[0], Sound.class).play();
 		}
 
 		//When no gems to fall - find gems to disappear
@@ -192,14 +208,14 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 		if (matchedAll.size() > 0)
 		{
 			// TODO add effect animations for gems with effects
-			this.animations.add(new DisappearAnimation(matchedAll, this.gemSize, this));
-			assetManager.get(GameFieldController.soundNames[Math.min(this.scoreController.getCombo(), 2)], Sound.class).play(0.01f);
+			this.animations.add(new DisappearAnimation(matchedAll, GameFieldControl.gemSize, this));
+			assetManager.get(GameFieldControl.soundNames[Math.min(this.scoreControl.getCombo(), 2)], Sound.class).play(0.01f);
 			return;
 		}
 		
 		if (this.field.testNoMoves())
 		{
-			this.animations.add(new DisappearAnimation(this.field.getAllGems(), this.gemSize, this));
+			this.animations.add(new DisappearAnimation(this.field.getAllGems(), GameFieldControl.gemSize, this));
 			return;
 		}
 		
@@ -226,7 +242,7 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 			Set<CellObject> chained = this.field.removeGems(disappearAnimation.gems);
 			if (chained.size() > 0)
 			{
-				this.animations.add(new DisappearAnimation(chained, this.gemSize, this));
+				this.animations.add(new DisappearAnimation(chained, GameFieldControl.gemSize, this));
 			}
 			for (CellObject gem: disappearAnimation.gems)
 			{
@@ -243,7 +259,7 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 					if (swapAnimation.gem2.effect == CellObject.Effects.KIND)
 					{
 						Set<CellObject> all = this.field.getAllGems();
-						this.animations.add(new DisappearAnimation(all, this.gemSize, this));
+						this.animations.add(new DisappearAnimation(all, GameFieldControl.gemSize, this));
 					}
 					else
 					{
@@ -266,7 +282,7 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 							}
 						}
 						allOfKind.add(swapAnimation.gem1);
-						this.animations.add(new DisappearAnimation(allOfKind, this.gemSize, this));
+						this.animations.add(new DisappearAnimation(allOfKind, GameFieldControl.gemSize, this));
 					}
 				}
 				else if (swapAnimation.gem2.effect == CellObject.Effects.KIND)
@@ -290,7 +306,7 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 						}
 					}
 					allOfKind.add(swapAnimation.gem2);
-					this.animations.add(new DisappearAnimation(allOfKind, this.gemSize, this));
+					this.animations.add(new DisappearAnimation(allOfKind, GameFieldControl.gemSize, this));
 				}
 				else if (swapAnimation.gem1.effect == CellObject.Effects.AREA)
 				{
@@ -300,7 +316,7 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 						// TODO remove 5x5 block
 						gems.add(swapAnimation.gem1);
 						gems.add(swapAnimation.gem2);
-						this.animations.add(new DisappearAnimation(gems, this.gemSize, this));
+						this.animations.add(new DisappearAnimation(gems, GameFieldControl.gemSize, this));
 					}
 					else if (swapAnimation.gem2.effect != CellObject.Effects.NONE)
 					{
@@ -308,7 +324,7 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 						// TODO remove 3 rows or 3 columns
 						gems.add(swapAnimation.gem1);
 						gems.add(swapAnimation.gem2);
-						this.animations.add(new DisappearAnimation(gems, this.gemSize, this));
+						this.animations.add(new DisappearAnimation(gems, GameFieldControl.gemSize, this));
 					}
 				}
 				else if (swapAnimation.gem2.effect == CellObject.Effects.AREA)
@@ -319,7 +335,7 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 						// TODO remove 3 rows or 3 columns
 						gems.add(swapAnimation.gem1);
 						gems.add(swapAnimation.gem2);
-						this.animations.add(new DisappearAnimation(gems, this.gemSize, this));
+						this.animations.add(new DisappearAnimation(gems, GameFieldControl.gemSize, this));
 					}
 				}
 				else if (swapAnimation.gem1.effect != CellObject.Effects.NONE &&
@@ -329,7 +345,7 @@ public class GameFieldController implements IGameController, IAnimationHandler, 
 					// TODO remove 1 row and 1 column
 					gems.add(swapAnimation.gem1);
 					gems.add(swapAnimation.gem2);
-					this.animations.add(new DisappearAnimation(gems, this.gemSize, this));
+					this.animations.add(new DisappearAnimation(gems, GameFieldControl.gemSize, this));
 				}
 			}
 		}

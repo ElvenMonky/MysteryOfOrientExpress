@@ -7,36 +7,54 @@ public class GameInputProcessor implements InputProcessor
 	//Screen coordinates
 	private IGameFieldInputController controller;
 	private int boardOffset;
-	public int cellSize;
+	private int cellSize;
+	private int offsetX;
+	private int offsetY;
 
 	private int touchedX = -1;
 	private int touchedY = -1;
 
-	public GameInputProcessor(IGameFieldInputController controller, int cellSize, int boardOffset)
+	public GameInputProcessor(IGameFieldInputController controller)
 	{
 		this.controller = controller;
+	}
+	
+	public void resize(int cellSize, int offsetX, int offsetY, int boardOffset)
+	{
+		this.offsetX = offsetX;
+		this.offsetY = offsetY;
 		this.cellSize = cellSize;
 		this.boardOffset = boardOffset;
 	}
 
-	public int coordToIndex(float coord)
+	public int getOffset(boolean x)
 	{
-		return (int)((coord - this.boardOffset) / this.cellSize);
+		return x ? this.offsetX : this.offsetY;
+	}
+
+	public int coordToIndex(float coord, boolean x)
+	{
+		return (int)((coord - this.boardOffset - this.getOffset(x)) / this.cellSize);
 	}
 	
-	public float indexToCoord(int index)
+	public float indexToCoord(float index, boolean x)
 	{
-		return (float)(this.boardOffset + (index + 0.5f) * this.cellSize);
+		return (float)(this.boardOffset + this.getOffset(x) + (index + 0.5f) * this.cellSize);
 	}
-	
+
+	public float sizeToCoord(float size)
+	{
+		return (float)(size * this.cellSize);
+	}
+
 	public boolean trySwap(int screenX, int screenY, float swapDistance)
 	{
 		int dx = screenX - this.touchedX;
 		int dy = screenY - this.touchedY;
 		if (Math.abs(dx) > swapDistance || Math.abs(dy) > swapDistance)
 		{
-			int i1 = this.coordToIndex(this.touchedX);
-			int j1 = this.coordToIndex(this.touchedY);
+			int i1 = this.coordToIndex(this.touchedX, true);
+			int j1 = this.coordToIndex(this.touchedY, false);
 			
 			int i2 = i1;
 			int j2 = j1;
@@ -65,8 +83,8 @@ public class GameInputProcessor implements InputProcessor
 		if (!this.controller.canMove())
 			return false;
 
-		int i = this.coordToIndex(screenX);
-		int j = this.coordToIndex(screenY);
+		int i = this.coordToIndex(screenX, true);
+		int j = this.coordToIndex(screenY, false);
 		if (this.controller.checkIndex(i) && this.controller.checkIndex(j))
 		{
 			this.touchedX = screenX;
